@@ -1,9 +1,9 @@
 # Linux 命令 · 10 题限时（40 分钟）
 
-在 Kali 里：
+在 Linux 里：
 
 ```bash
-bash setup.sh          # 布置环境（在 labs/contest/linux 目录里）
+bash setup.sh          # 布置环境（在 linux/ 目录里）
 ```
 
 全部题目都在 `~/ctfdrill` 下。**先别看 setup.sh 的内容**，也别用 `ls -R` 人眼扫 —— 这练的就是「不知道在哪时用什么命令」。

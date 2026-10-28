@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Linux 命令 10 题判分（在 Kali 里跑：python3 check.py）
+"""Linux 命令 10 题判分（在本目录跑：python3 check.py）
 
 答案不写死在这里 —— 每次都从 ~/ctfdrill 现场读出来比对，
 所以 setup.sh 改了内容也不会判错（断言的是关系，不是快照）。
@@ -49,7 +49,7 @@ def find_first(pred, root=R):
 def expected():
     exp = {}
     if not os.path.isdir(R):
-        sys.exit("没找到 %s —— 先在 labs/contest/linux 里跑 bash setup.sh" % R)
+        sys.exit("没找到 %s —— 先在 linux/ 目录里跑 bash setup.sh" % R)
 
     p1 = find_first(lambda p, n: n.startswith("flag") and os.path.isfile(p))
     exp[1] = first_flag(p1) if p1 else "?"

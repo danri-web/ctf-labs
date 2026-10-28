@@ -1,6 +1,6 @@
 # Web 热身 · 5 关（限时 40 分钟）
 
-## 启动（在 Kali 里）
+## 启动（在 Linux 里）
 
 ```bash
 cd web

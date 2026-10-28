@@ -665,7 +665,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['flag'])) {
         "",
         "> ⚠️ **先自己做完八关再看这份** ✅",
         "> 生成器：`scripts\\ctf\\build_day11_lab.py`（内存里造 + 反解验证，全过才落盘）",
-        "> 靶场入口：`http://127.0.0.1/day11/`　背景题：`labs\\js\\zip-basics.html`",
+        "> 靶场入口：`http://127.0.0.1/day11/`　背景题：`zip-basics.html`",
         "",
     ]
     for n in sorted(lv):

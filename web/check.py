@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Web 热身 5 关判分（在 labs/contest/web 里跑：python3 check.py）"""
+"""Web 热身 5 关判分（在本目录跑：python3 check.py）"""
 import os
 import sys
 
