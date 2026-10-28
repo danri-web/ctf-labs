@@ -1,0 +1,6 @@
+# 统一用 LF：bash 脚本和 Python 在 Linux 上不能带 CRLF
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.zip binary
