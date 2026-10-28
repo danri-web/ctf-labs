@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>ZIP 结构 + 压缩包杂项 + Day 11 背景题（16 题自动判分）</title>
+<style>
+  body{font-family:"Microsoft YaHei",Segoe UI,sans-serif;background:#f5f7fa;color:#1c1c1e;
+       max-width:920px;margin:0 auto;padding:22px 20px 60px;line-height:1.75}
+  h1{font-size:20px;border-bottom:2px solid #2b6cb0;padding-bottom:8px}
+  .q{background:#fff;border:1px solid #d7e0ea;border-radius:6px;padding:14px 16px;margin:14px 0}
+  .q.right{border-color:#2f855a;background:#f6fdf9}
+  .q.wrong{border-color:#c53030;background:#fffafa}
+  .qt{font-weight:600;margin-bottom:9px}
+  .tag{float:right;font-size:12px;color:#8a97a6;font-weight:400}
+  label.opt{display:block;margin:5px 0;cursor:pointer;padding:3px 4px;border-radius:4px}
+  label.opt:hover{background:#eef4fb}
+  input[type=text]{width:100%;box-sizing:border-box;font-family:Consolas,monospace;font-size:13.5px;
+       padding:8px;border:1px solid #c3d4e6;border-radius:4px;background:#fff}
+  code{background:#eef2f7;padding:1px 5px;border-radius:3px;font-family:Consolas,monospace;font-size:13px}
+  pre{background:#1e1e22;color:#e8e8ec;padding:10px 12px;border-radius:5px;
+      font-family:Consolas,monospace;font-size:12.5px;white-space:pre-wrap;margin:8px 0}
+  .why{display:none;background:#fdf6ec;border-left:4px solid #d69e2e;padding:9px 12px;border-radius:3px;
+       font-size:13px;margin:9px 0;white-space:pre-wrap}
+  .q.right .why,.q.wrong .why{display:block}
+  .key{background:#eef7ff;border-left:4px solid #2b6cb0;padding:9px 12px;border-radius:3px;
+       font-size:13.5px;margin:9px 0}
+  #score{position:sticky;top:0;z-index:9;background:#24476b;color:#fff;padding:9px 15px;
+         border-radius:5px;font-size:14px;margin-bottom:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  #score b{font-size:16px}
+  button{padding:6px 16px;font-size:13.5px;background:#2b6cb0;color:#fff;border:none;border-radius:4px;cursor:pointer}
+  button:hover{background:#245a91}
+  button.ghost{background:#5a6b7d}
+  .st{display:none;background:#1e1e22;color:#e8e8ec;padding:12px;border-radius:5px;margin-top:16px;
+      font-family:Consolas,monospace;font-size:13px;white-space:pre-wrap}
+</style>
+</head>
+<body>
+
+<div id="score">
+  得分：<b id="scoreText">0 / 16</b>
+  <button onclick="grade()">判分</button>
+  <button class="ghost" onclick="reset()">重做</button>
+  <span style="font-size:12.5px;opacity:.85">错题会自动展开讲解 —— 讲解才是重点</span>
+</div>
+
+<h1>ZIP 结构 + 压缩包杂项 + Day 11 背景题</h1>
+
+<div class="key">
+<b>一句话：压缩包题不是「解压」，是「读元数据」。</b>ZIP 自己就带着目录、CRC、注释、文件名编码 ——
+出题人最喜欢动的地方，全在这几个字段里。把结构搞清，你就不用猜密码。
+<br>
+<span style="color:#8a6d1f">⚠️ 顺序：先做完这一页 → 再打 <code>http://127.0.0.1/day11/</code> 八关。</span>
+</div>
+
+<div class="key">
+<b>拿到一个可疑压缩包，固定四步：</b>
+① 前 4 字节是不是 <code>50 4B 03 04</code>（真的是 zip 吗）
+② 列中央目录（名字 / 大小 / CRC / flags）—— 不用密码
+③ 看 EOCD 里的注释（白送的藏点）
+④ 以上都没线索，才去解压 / 爆破密码。
+</div>
+
+<div id="app"></div>
+<div id="st" class="st"></div>
+
+<script>
+const QUESTIONS = [
+ /* ============ A. ZIP 的骨架 ============ */
+ { id:1, type:"choice",
+   q:"一个 ZIP 文件，从前往后的实际结构是？",
+   options:["N 个「本地文件头 + 压缩数据」→ 中央目录 → EOCD（结尾记录）",
+            "EOCD → 中央目录 → 各个文件的头",
+            "只有压缩数据，没有目录",
+            "文件头 → 加密头 → 文件尾"],
+   answer:0,
+   why:"顺序是：每个文件一份「本地头 + 数据」，全部写完后写「中央目录」（每个文件一条记录：名字、CRC、大小、本地头偏移），最后写「EOCD」（End Of Central Directory）。\n"
+      +"⭐ 关键：**目录在最后**，所以解压器必须先从文件尾找到 EOCD，才知道目录在哪。\n"
+      +"⚠️ 名字和 CRC 存了**两份**（本地头一份、中央目录一份）—— 两份可能不一致，这是伪加密题的基础（第 6、8 题）。" },
+
+ { id:2, type:"choice",
+   q:"解压器为什么要从文件末尾往前找，而不是从头读？",
+   options:["EOCD 在末尾，只有它记录了中央目录的偏移和大小",
+            "因为压缩数据是倒着存的",
+            "因为 Windows 规定这样",
+            "其实不用，从头读也一样"],
+   answer:0,
+   why:"EOCD 固定在文件最后 22 字节（后面还可跟最多 65535 字节注释），签名是 50 4B 05 06。\n"
+      +"它记录：条目数、中央目录大小、**中央目录偏移**、注释长度。\n"
+      +"⭐ 所以「文件被截断」是最常见的坏包原因；反过来，**在 zip 尾巴后面追加数据一般不影响打开** —— 解压器只认 EOCD 指的范围。\n"
+      +"💡 这也是自解压包（zip + exe）能工作的原因。" },
+
+ { id:3, type:"fill",
+   q:"ZIP 每个文件的「本地文件头」签名是 4 字节，十六进制是什么？（写成 504b0304 这种样式）",
+   answer:["504b0304","50 4b 03 04","504B0304","50 4B 03 04"],
+   why:"50 4B = ASCII 的「PK」（Phil Katz），03 04 = 本地文件头。\n"
+      +"⭐ 记住字段偏移（从签名算起）：标志位 +6（2 字节）、CRC +14（4 字节）、压缩后大小 +18、原始大小 +22、文件名长度 +26。\n"
+      +"   Day 11 要动的「加密标志位」就在 +6 —— 记住这个偏移，HxD 里才不用瞎点。\n"
+      +"⚠️ 完整结构前面还有版本号（+4），别数错。" },
+
+ { id:4, type:"fill",
+   q:"ZIP 的 EOCD（中央目录结尾记录）签名是 4 字节，十六进制是什么？",
+   answer:["504b0506","50 4b 05 06","504B0506","50 4B 05 06"],
+   why:"50 4B 05 06。无注释时 EOCD 正好 22 字节：磁盘号(2) 目录所在磁盘(2) 本盘条目数(2) 总条目数(2) 目录大小(4) 目录偏移(4) 注释长度(2)。\n"
+      +"⭐ 找它的姿势：**从文件尾往前搜 50 4B 05 06**（因为后面可能有注释）。\n"
+      +"⚠️ 注意别和 50 4B 01 02（中央目录条目）搞混 —— 三个签名长得像，位置完全不同。" },
+
+ { id:5, type:"choice",
+   q:"「中央目录条目」的签名是哪 4 个字节？",
+   options:["50 4B 01 02","50 4B 03 04","50 4B 05 06","89 50 4E 47"],
+   answer:0,
+   why:"50 4B 01 02。中央目录每条比本地头多几个字段：版本/磁盘号/内部属性/外部属性/本地头偏移。\n"
+      +"⭐ 「本地头偏移」是找数据的钥匙：中央目录说「这个文件的头在第 X 字节」，解压器就跳过去读。\n"
+      +"💡 所以手工解析的最短路径是：**只读中央目录**（名字、CRC、大小、偏移全在里面），根本不用碰本地头。" },
+
+ { id:6, type:"choice",
+   q:"本地头说「没加密」，中央目录说「加密了」。解压器听谁的？",
+   options:["中央目录 —— Python 的 zipfile 就只读它",
+            "本地头",
+            "谁写在后面听谁的",
+            "两个都读，冲突就报错"],
+   answer:0,
+   why:"本地头和中央目录各存一份 flags / CRC / 大小。Python 的 zipfile 用**中央目录**决定「要不要密码、名字是什么、CRC 多少」，再用本地头偏移去找数据。\n"
+      +"⭐ 本机实测（Python 3.14）：只在本地头清掉加密标志、中央目录还留着 → 依然报 File is encrypted。\n"
+      +"⚠️ 反过来只改中央目录不改本地头，7-Zip 这类工具会报错 —— **两处一致**才是干净文件。这条就是第 8 题的答案。" },
+
+ /* ============ B. 伪加密 ============ */
+ { id:7, type:"choice",
+   q:"「ZIP 伪加密」的本质是？",
+   options:["把标志位的 bit0（加密）置 1，但数据其实没加密",
+            "用空密码加密了一遍",
+            "把文件内容换成了密文",
+            "把文件名改成 .enc"],
+   answer:0,
+   why:"flags 的第 0 位 = 「这个条目是加密的」。解压器看到它就要求密码，并按 ZipCrypto 去解；可数据本来就是明文，一「解」就乱，于是报需要密码 / 密码错误。\n"
+      +"⭐ 所以修法不是「找密码」，而是**把这一位清回 0**。\n"
+      +"⚠️ 真假加密的判据：真加密的数据是密文，清掉标志只会得到乱码；伪加密清掉标志就是正常文件。" },
+
+ { id:8, type:"choice",
+   q:"修伪加密要改几处标志位？",
+   options:["两处：本地文件头 + 中央目录",
+            "一处，随便哪处都行",
+            "三处（还要改 EOCD）",
+            "不用改，改后缀就行"],
+   answer:0,
+   why:"同一份元数据存了两遍（第 6 题），解析器各取所需，所以两处都要清。\n"
+      +"⭐ 本机实测：只清本地头 → RuntimeError: File 'flag.txt' is encrypted；两处都清 → 正常读出。\n"
+      +"💡 HxD 里的做法：搜 50 4B 03 04 和 50 4B 01 02 各一次，把**签名后第 6 / 第 8 字节**的 01 改成 00。\n"
+      +"   注意：本地头是 +6，中央目录是 +8（它前面多了「版本」2 字节）—— 偏移不一样，这是最容易改错的地方。" },
+
+ { id:9, type:"choice",
+   q:"ZIP 的「压缩包注释」存在哪里？",
+   options:["EOCD 的 comment 字段：注释长度之后一直到文件结尾",
+            "每个文件的末尾",
+            "中央目录的某一条记录里",
+            "单独一个 .comment 文件"],
+   answer:0,
+   why:"EOCD 最后 2 字节是注释长度，之后就是注释原文（最多 65535 字节，不压缩、不加密）。\n"
+      +"⭐ 这是白送的藏点：不影响解压、不需要密码、WinRAR 属性里能看、Python 里一行 zf.comment。\n"
+      +"⚠️ 能读到注释的前提是 EOCD 没坏：尾部追加数据通常没事，被截断就找不到 EOCD 了。" },
+
+ /* ============ C. 文件名编码 ============ */
+ { id:10, type:"choice",
+   q:"ZIP flags 的第 11 位（0x800）表示什么？",
+   options:["文件名 / 注释用的是 UTF-8 编码",
+            "这个文件被加密了",
+            "这个条目是目录",
+            "使用了数据描述符"],
+   answer:0,
+   why:"置了 bit11，解压器按 UTF-8 解码文件名；**没置**，按 cp437 解码。\n"
+      +"⭐ 老工具、手工造包经常不置这一位 → 中文名变乱码，但字节本身是对的。\n"
+      +"⚠️ 有些题就是故意把这一位清掉，让 flag 藏在文件名里、却显示成乱码。\n"
+      +"   （bit3 = 数据描述符、bit0 = 加密，也是 flags 里常被利用的两位。）" },
+
+ { id:11, type:"choice",
+   q:"flags 没置 UTF-8 位时，ZIP 规范要求文件名按哪个字符集解释？",
+   options:["cp437（IBM PC 的老代码页，一个字节一个字符）",
+            "UTF-8",
+            "GBK",
+            "它不规定，各工具随便解"],
+   answer:0,
+   why:"cp437 是 DOS 时代的 8 位字符集。把一段 UTF-8 字节硬按 cp437 解释，就会得到经典乱码。\n"
+      +"⭐ 本机实测：中文「秘密」的 UTF-8 是 E7 A7 98 E5 AF 86，按 cp437 显示成 τºÿσ»å。\n"
+      +"💡 修法很机械：把乱码字符串按 cp437 **编码回字节**，再按 UTF-8 解码。\n"
+      +"⚠️ 这不是「文件坏了」，只是「标签贴错了」—— 字节一直是好的。" },
+
+ { id:12, type:"choice",
+   q:"`name = 'τºÿσ»åflag{...}.txt'` 这种乱码文件名，正确的还原写法是？",
+   options:["name.encode('cp437').decode('utf-8')",
+            "name.encode('utf-8').decode('cp437')",
+            "name.decode('utf-8')",
+            "把文件重命名成 utf-8.txt 就行"],
+   answer:0,
+   why:"方向要「反着来」：显示时是 bytes --cp437解码--> str，所以还原就是 str --cp437编码--> bytes --utf-8解码--> str。\n"
+      +"⭐ 记法：**谁解的码，就用谁编码回去**。\n"
+      +"⚠️ 顺序搞反会得到另一串乱码或 UnicodeEncodeError —— 报错本身就是判据：编码表用错了。\n"
+      +"💡 不确定时可以把几种组合都试一遍，看哪个结果是可读中文 / 像 flag 的东西。" },
+
+ /* ============ D. 嵌套 / 密码 / CRC ============ */
+ { id:13, type:"choice",
+   q:"为什么 ZIP 里面可以再套一个 ZIP？",
+   options:["压缩包只是字节流，内容是什么都行 —— 包括另一个压缩包",
+            "ZIP 格式专门设计了嵌套支持",
+            "必须把后缀改成 .zip 才能套",
+            "只有 RAR 能套"],
+   answer:0,
+   why:"压缩包不关心里面装的是什么：文本、图片、另一个压缩包都只是字节。\n"
+      +"⭐ 套娃题的解法是**循环**：每解一层，先看第一个文件的前 4 字节是不是 50 4B 03 04，是就继续。\n"
+      +"💡 纯 Python 连临时文件都不用：把内层字节塞进 io.BytesIO，再开一个 ZipFile。" },
+
+ { id:14, type:"choice",
+   q:"同样是弱密码，为什么 ZipCrypto 能在纯 Python 里秒爆，AES 加密就不行？",
+   options:["ZipCrypto 每个密码只校验 1 个字节，密码错立刻淘汰，不用解压数据",
+            "因为 ZipCrypto 的密码都比较短",
+            "因为 ZipCrypto 其实没加密",
+            "因为 CRC 能直接反推出密码"],
+   answer:0,
+   why:"ZipCrypto 的 12 字节加密头里，最后一个字节是校验值（通常是 CRC 的高字节）。密码错 → 这一字节对不上 → 立刻换下一个，**不用解压**。\n"
+      +"⭐ 几百个词的字典在纯 Python 里是毫秒级；几百万条也就是分钟级。\n"
+      +"⚠️ AES（WinZip AE-1/AE-2、7z）完全是另一套：HMAC 校验 + 高迭代次数，而且 Python 的 zipfile **根本不支持读 AES**。遇到它别硬爆，先想别的路。\n"
+      +"💡 还有一个更快的判据：AES 包的压缩方法字段是 99，一眼就能认出来。" },
+
+ { id:15, type:"choice",
+   q:"一个 4 字节的文件，数据被清零了，但中央目录里的 CRC32 还是真的。为什么这题能解？",
+   options:["CRC32 是确定函数：知道长度和字母表，可以穷举到 CRC 相同",
+            "CRC32 可以逆运算出任意长度的原文",
+            "CRC32 每次算出来都不一样",
+            "CRC32 就是密码哈希，能用来登录"],
+   answer:0,
+   why:"CRC32 是校验值不是加密：同样 4 个字节永远算出同一个数，所以「知道 CRC + 知道字母表 → 枚举」。\n"
+      +"⭐ 本机实测：4 位 [0-9a-z] 共 36^4 ≈ 168 万种，Python 一两秒撞出来。\n"
+      +"⚠️ 前提是数据「被抹掉但 CRC 还留着」：ZIP_STORED（不压缩）时数据就是原始字节，清零很容易；\n"
+      +"   如果是 ZIP_DEFLATED，数据是压缩流，清零后会连解压都失败 —— 所以先看压缩方法字段（0 = 存储，8 = deflate）。\n"
+      +"💡 这类题的入口永远是：**中央目录的大小/CRC 和磁盘上的数据对不上**。" },
+
+ { id:16, type:"choice",
+   q:"拿到一个「打不开 / 要密码 / 不知道想考什么」的压缩包，第一步该做什么？",
+   options:["看前 4 字节是不是 50 4B 03 04，然后列中央目录（名字/大小/CRC/flags），再看 EOCD 注释",
+            "先跑 hashcat 爆密码",
+            "先把后缀改成 .zip",
+            "先解压，报错了再说"],
+   answer:0,
+   why:"前三步全是**读元数据**：不解压、不要密码、最便宜。很多题在第一步就结束了（名字里就是 flag）。\n"
+      +"⭐ 顺序的意义和 Day 10 一样：**先找异常，再谈怎么解**。\n"
+      +"⚠️ 常见异常清单：注释非空 ／ 文件名乱码 ／ flags 有 0x1（伪加密）／ 条目数比你以为的多 ／\n"
+      +"   CRC 或大小对不上 ／ 文件尾有第二段 PK ／ 压缩方法是 99（AES）。" }
+];
+
+/* ------------------------------------------------------------ 渲染 / 判分 */
+const app=document.getElementById('app');
+const N=QUESTIONS.length;
+document.getElementById('scoreText').textContent='0 / '+N;
+
+function esc(s){return String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));}
+function norm(s){return String(s).trim().toLowerCase().replace(/\s+/g,' ');}
+
+function render(){
+  app.innerHTML=QUESTIONS.map((item,i)=>{
+    let body;
+    if(item.type==='fill'){
+      body=`<input type="text" id="a${i}" autocomplete="off" spellcheck="false" placeholder="在这里填答案（回车也能判分）">`;
+    }else{
+      body=item.options.map((o,k)=>
+        `<label class="opt"><input type="radio" name="q${i}" value="${k}"> ${k+1}. ${esc(o)}</label>`).join('');
+    }
+    return `<div class="q" id="q${i}">
+      <div class="qt"><span class="tag">第 ${i+1} 题</span>${esc(item.q)}</div>
+      ${body}
+      <div class="why" id="w${i}"></div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('input[type=text]').forEach(el=>
+    el.addEventListener('keydown',e=>{ if(e.key==='Enter') grade(); }));
+}
+
+function checkOne(item,i){
+  if(item.type==='fill'){
+    const got=document.getElementById('a'+i).value;
+    return (item.answer||[]).some(a=>norm(a)===norm(got));
+  }
+  const sel=document.querySelector(`input[name=q${i}]:checked`);
+  return !!sel && Number(sel.value)===item.answer;
+}
+
+function grade(){
+  let right=0;
+  QUESTIONS.forEach((item,i)=>{
+    const ok=checkOne(item,i);
+    if(ok) right++;
+    const box=document.getElementById('q'+i);
+    box.classList.toggle('right',ok);
+    box.classList.toggle('wrong',!ok);
+    document.getElementById('w'+i).textContent =
+      (ok?'✅ 对\n':'❌ 错\n')+(item.why||'（缺 why：这题还没写解析！）');
+  });
+  document.getElementById('scoreText').textContent=right+' / '+N;
+}
+
+function reset(){
+  render();
+  document.getElementById('scoreText').textContent='0 / '+N;
+  document.getElementById('st').style.display='none';
+  window.scrollTo(0,0);
+}
+
+/* ------------------------------------------------ ?selftest=1 */
+if(new URLSearchParams(location.search).get('selftest')==='1'){
+  const lines=[]; let bad=0;
+  QUESTIONS.forEach((item,i)=>{
+    if(!item.why){lines.push(`题 ${i+1}: [X] 缺 why`);bad++;}
+    if(item.type==='fill'){
+      if(!Array.isArray(item.answer)||!item.answer.length){lines.push(`题 ${i+1}: [X] fill 的 answer 必须是非空数组`);bad++;}
+    }else{
+      if(!Array.isArray(item.options)||item.options.length<2){lines.push(`题 ${i+1}: [X] 选项少于 2 个`);bad++;}
+      if(typeof item.answer!=='number'||item.answer<0||item.answer>=(item.options||[]).length){
+        lines.push(`题 ${i+1}: [X] answer 下标越界`);bad++;}
+    }
+  });
+  if(N!==new Set(QUESTIONS.map(q=>q.id)).size){lines.push('[X] id 有重复');bad++;}
+  lines.push(bad===0?`\nSELFTEST ALL PASS（${N} 题）`:`\nSELFTEST FAILED：${bad} 处问题`);
+  const st=document.getElementById('st');
+  st.style.display='block';
+  st.textContent=lines.join('\n');
+}
+render();
+</script>
+</body>
+</html>
